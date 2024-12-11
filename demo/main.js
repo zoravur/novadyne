@@ -235,7 +235,7 @@ canvas.width = 1800;
 canvas.height = 1300;
 
 // track planets and ships
-const planets = levels[LEVEL_NUM-1].planets; //level1.planets;
+let planets = levels[LEVEL_NUM-1].planets; //level1.planets;
 let ships = levels[LEVEL_NUM-1].ships; //level1.ships;
 let hoveredPlanet = null;
 let selectedPlanets = [];
@@ -559,7 +559,7 @@ function update() {
   }
 
   const blueCount = ships.filter(ship => ship.team === 'BLUE').length;
-  if (blueCount === ships.length && tickCount > 300) { // use time to ignore the start of the game where there are no ships
+  if (blueCount === ships.length && tickCount > 500) { // use time to ignore the start of the game where there are no ships
       ctx.font = "bold 72px Arial"; // big bold text
       ctx.textAlign = "center"; // center the text horizontally
       ctx.textBaseline = "middle"; // center the text vertically
@@ -575,7 +575,7 @@ function update() {
 
       // draw the text
       ctx.fillText("VICTORY", centerX, centerY);
-  } else if (blueCount === 0 && tickCount > 300) {
+  } else if (blueCount === 0 && tickCount > 500) {
     ctx.font = "bold 72px Arial"; // big bold text
     ctx.textAlign = "center"; // center the text horizontally
     ctx.textBaseline = "middle"; // center the text vertically
@@ -681,13 +681,24 @@ function addButton(text, id, onclick) {
 
 let paused = false;
 
+addButton('play lvl1', 'lvl1Select', e => {
+  planets = level1.planets;
+  ships = level1.ships;
+  tickCount = 0;
+});
+
+addButton('play lvl2', 'lvl2Select', e => {
+  planets = level2.planets;
+  ships = level2.ships;
+  tickCount = 0;
+});
+
 addButton('pause', 'pauseButton', e => {
   paused = !paused;
   e.target.innerHTML = paused ? 'play' : 'pause';
   if (!paused) {
     update();
   }
-
 });
 
 let jumping = true;
@@ -699,6 +710,8 @@ let drawDebug = false;
 addButton('toggle debug', 'debugToggleButton', e => {
   drawDebug = !drawDebug;
 });
+
+
 
 
 
