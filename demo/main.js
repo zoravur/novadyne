@@ -90,11 +90,6 @@ class Explosion {
 // // Start animation loop
 // render(); 
 
-
-
-
-
-
 //// UTIL FUNCTIONS /////////
 
 function createSeededRandom(seed) {
@@ -138,6 +133,8 @@ function randomColor(randomFunc) {
   return `hsl(${randomFunc() * 360}, 65%, 55%)`;
 }
 const planetRandom = createSeededRandom(1);
+
+// LEVEL 1 COMPLETE
 const level1 = {
   planets: [{
     x: 500,
@@ -155,6 +152,67 @@ const level1 = {
   ships: []
 };
 
+// LEVEL 2 COMPLETE
+const level2 = {
+  planets: [{
+    x: 1247,
+    y: 419,
+    team: 'RED',
+    size: 90,
+    color: randomColor(planetRandom),
+  }, {
+    x: 900,
+    y: 500,
+    team: 'RED',
+    size: 100,
+    color: randomColor(planetRandom),
+  }, {
+    x: 615,
+    y: 277,
+    team: 'RED',
+    size: 75,
+    color: randomColor(planetRandom),
+  }, {
+    x: 297,
+    y: 754,
+    team: 'BLUE',
+    size: 30,
+    color: randomColor(planetRandom),
+  }, {
+    x: 503,
+    y: 616,
+    team: 'BLUE',
+    size: 30,
+    color: randomColor(planetRandom),
+  }, {
+    x: 860,
+    y: 797,
+    team: 'BLUE',
+    size: 30,
+    color: randomColor(planetRandom),
+  }, {
+    x: 968,
+    y: 1000,
+    team: 'BLUE',
+    size: 30,
+    color: randomColor(planetRandom),
+  }, {
+    x: 591,
+    y: 845,
+    team: 'BLUE',
+    size: 40,
+    color: randomColor(planetRandom),
+  }, {
+    x: 1258,
+    y: 822,
+    team: 'BLUE',
+    size: 40,
+    color: randomColor(planetRandom),
+  }],
+  ships: [],
+}
+const levels = [level1, level2];
+
 //////////// CONSTANTS ///////////////
 const FRAMERATE = 60; // DO NOT MODIFY
 const SHIP_SPEED = 1;
@@ -162,7 +220,8 @@ const SIM_FACTOR = 2;
 const NUM_PLANETS = 5;
 const WORLD_SEED = 7;
 const COMBAT_RATE = 20;
-const BASE_PRODUCTION_RATE = 2;
+const BASE_PRODUCTION_RATE = 1;
+const LEVEL_NUM = 2;
 
 // seeds i like: [6, 7, 8, 9]
 // Example usage
@@ -172,12 +231,12 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 // set canvas to fill the screen
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+canvas.width = 1800;
+canvas.height = 1300;
 
 // track planets and ships
-const planets = level1.planets;
-let ships = level1.ships;
+const planets = levels[LEVEL_NUM-1].planets; //level1.planets;
+let ships = levels[LEVEL_NUM-1].ships; //level1.ships;
 let hoveredPlanet = null;
 let selectedPlanets = [];
 let explosions = [];
@@ -215,12 +274,12 @@ function computeSquaredDistance(entity1, entity2) {
   return (x-w)*(x-w) + (y-z)*(y-z);
 }
 
-function reassignFraction(pIdx1, pIdx2, frac = 0.6) {
-  const totalAt1 = ships.filter(({planetIdx, orbiting}) => planetIdx === pIdx1 && orbiting).length;
+function reassignFraction(pIdx1, pIdx2, team, frac = 0.6) {
+  const totalAt1 = ships.filter(({planetIdx, orbiting, team: shipTeam}) => planetIdx === pIdx1 && orbiting && shipTeam===team).length;
   
   let counter = 0;
   ships.forEach(ship => {
-    if (ship.planetIdx === pIdx1 && ship.orbiting && counter < totalAt1 * frac) {
+    if (ship.planetIdx === pIdx1 && ship.orbiting && ship.team === team && counter < totalAt1 * frac) {
       ship.planetIdx = pIdx2;
       counter += 1;
     }
@@ -240,9 +299,8 @@ function update() {
       idx2 = Math.floor(seededRandom() * planets.length);
     }
 
-    if (jumping) reassignFraction(idx1, idx2);
+    if (jumping) reassignFraction(idx1, idx2, 'RED', 0.8);
   }
-
 
   /// ship movement -- this code is super janky
   ships.forEach(ship => {
@@ -282,7 +340,10 @@ function update() {
       return acc; 
     }, {});
 
-    let buckets = Array.from({length: planets.length}, (_, idx) => ({  ships: [], counts: {} }));
+    let buckets = Array.from({length: planets.length}, (_, idx) => ({  
+      ships: [], 
+      counts: Object.fromEntries(Object.keys(teamColorMap).map(team => [team, 0]))
+    }));
     ships.forEach((ship, shipIdx) => {
       if (ship.orbiting) {
         buckets[ship.planetIdx].ships.push(shipIdx);
@@ -296,7 +357,7 @@ function update() {
     let newShips = [...ships];
     buckets.forEach((bucket, planetIdx) => {
       /// combat ////
-      const x = bucket.ships.length;
+      let x = bucket.ships.length;
       const teams = Object.keys(bucket.counts);
       actionProb = x > 0 ? Math.exp((x - 30)/30) / (1 + Math.exp((x-30)/ 30)) : 0;
       if (seededRandom() < actionProb) {
@@ -310,6 +371,7 @@ function update() {
           let shipIdx = bucket.ships[i];
           if (ships[shipIdx].team === selectedTeam && ships[shipIdx].orbiting) {
             newShips.splice(shipIdx, 1);
+            x -= 1;
             explosions.push(new Explosion(ships[shipIdx].x, ships[shipIdx].y));
             break;
           }
@@ -318,7 +380,10 @@ function update() {
 
       /// allegiance switching ///
       teams.forEach(t => {
-        if (bucket.counts[t] === bucket.ships.length) {
+        if (drawDebug) {
+          // console.log(bucket.counts[t], x, t);
+        }
+        if (bucket.counts[t] && bucket.counts[t] >= x) {
           // planet planetIdx is occupied solely by team t
           planets[planetIdx].team = t;
         }
@@ -331,12 +396,11 @@ function update() {
         const productionRate = planets[planetIdx].size;
         const baseRate = Math.floor(500 / BASE_PRODUCTION_RATE);
         //console.log('generation');
-        //console.log(tickCount / 20, Math.floor(baseRate / productionRate));
+        // console.log(tickCount / 20, Math.floor(baseRate / productionRate));
         if ((tickCount / 20) % (Math.ceil(baseRate / productionRate)+1) === 0) {
-
-          if (planetIdx === 0) {
-            console.log(totalPerTeam, teamCapacities);
-          }
+          // if (planetIdx === 0) {
+          //   console.log(totalPerTeam, teamCapacities);
+          // }
           const orbitRadius = 1 / (seededRandom() * 0.5 + 0.3);
           newShips.push({ 
             x: planets[planetIdx].x,
@@ -355,7 +419,7 @@ function update() {
 
 
 
-  //////////////////////// RENDERING /////////////////////////////
+  //////////////////////// rendering / RENDERING /////////////////////////////
   function drawShip(ctx, x, y, dx, dy, fill) {
     const shipLength = 12; // length of the ship (long side)
     const shipWidth = 8;  // width of the kite (short side)
@@ -461,13 +525,7 @@ function update() {
     } else {
       drawShip(ctx, ship.x, ship.y, ship.dx, ship.dy, ship.color);
     }
-    // ctx.beginPath();
-    // ctx.arc(ship.x, ship.y, 5, 0, Math.PI * 2);
-    // ctx.fillStyle = ship.color;
-    // ctx.fill();
-    // ctx.closePath();
   });
-
 
   // Step and draw each explosion
   for (const explosion of explosions) {
@@ -477,6 +535,63 @@ function update() {
   
   // Remove completed explosions
   explosions = explosions.filter(exp => !exp.isCompleted());
+  
+  if (drawDebug) {
+    const gridSpacing = 100;
+    ctx.strokeStyle = "red"; // grid line color
+    ctx.lineWidth = 0.5; // thin grid lines
+
+    // draw vertical lines
+    for (let x = 0; x <= canvas.width; x += gridSpacing) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+
+    // draw horizontal lines
+    for (let y = 0; y <= canvas.height; y += gridSpacing) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+  }
+
+  const blueCount = ships.filter(ship => ship.team === 'BLUE').length;
+  if (blueCount === ships.length && tickCount > 300) { // use time to ignore the start of the game where there are no ships
+      ctx.font = "bold 72px Arial"; // big bold text
+      ctx.textAlign = "center"; // center the text horizontally
+      ctx.textBaseline = "middle"; // center the text vertically
+      ctx.fillStyle = "gold"; // main text color
+      ctx.strokeStyle = "black"; // outline color
+      ctx.lineWidth = 4; // outline thickness
+
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+
+      // draw outline for contrast
+      ctx.strokeText("VICTORY", centerX, centerY);
+
+      // draw the text
+      ctx.fillText("VICTORY", centerX, centerY);
+  } else if (blueCount === 0 && tickCount > 300) {
+    ctx.font = "bold 72px Arial"; // big bold text
+    ctx.textAlign = "center"; // center the text horizontally
+    ctx.textBaseline = "middle"; // center the text vertically
+    ctx.fillStyle = "red"; // main text color
+    ctx.strokeStyle = "black"; // outline color
+    ctx.lineWidth = 4; // outline thickness
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    // draw outline for contrast
+    ctx.strokeText("DEFEAT", centerX, centerY);
+
+    // draw the text
+    ctx.fillText("DEFEAT", centerX, centerY);
+  }
   
   if (paused === true) return;
   requestAnimationFrame(update);
@@ -511,7 +626,7 @@ canvas.addEventListener('mouseup', () => {
   if (hoveredPlanet !== null) {
     selectedPlanets.forEach((planetIdx) => { // this is getting confusing, but selectedPlanets stores indices itself
       //console.log(planetIdx, hoveredPlanet);
-      reassignFraction(planetIdx, hoveredPlanet);
+      reassignFraction(planetIdx, hoveredPlanet, 'BLUE');
     });
   } else {
     selectedPlanets.length = 0;
@@ -519,6 +634,12 @@ canvas.addEventListener('mouseup', () => {
   }
 
   isMouseDown = false;
+});
+
+canvas.addEventListener('click', () => {
+  if (drawDebug) {
+    console.log(JSON.stringify({mouseX, mouseY}));
+  }
 });
 
 canvas.addEventListener('mousemove', e=>{
@@ -548,18 +669,37 @@ canvas.addEventListener('mousemove', e=>{
   } 
 });
 
+
+function addButton(text, id, onclick) {
+  const btn = document.createElement('button');
+  btn.id = id;
+  btn.innerHTML = text;
+  document.getElementById('buttonContainer').appendChild(btn);
+  btn.addEventListener('click', onclick);
+}
+
+
 let paused = false;
-document.getElementById('pauseButton').addEventListener('click', e => {
+
+addButton('pause', 'pauseButton', e => {
   paused = !paused;
   e.target.innerHTML = paused ? 'play' : 'pause';
   if (!paused) {
     update();
   }
+
 });
 
-let jumping = false;
-document.getElementById('jumpToggleButton').addEventListener('click', e => {
+let jumping = true;
+addButton('toggle "ai"', 'jumpToggleButton', e => {
   jumping = !jumping;
 });
+
+let drawDebug = false;
+addButton('toggle debug', 'debugToggleButton', e => {
+  drawDebug = !drawDebug;
+});
+
+
 
 update(); // start loop

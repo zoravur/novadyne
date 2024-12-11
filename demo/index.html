@@ -8,14 +8,27 @@
     body {
       margin: 0;
       overflow: hidden;
+      //display: flex;
+      align-items: center;
+      height: 100vh;
+      background-color: #111;
     }
     canvas {
       display: block;
     }
 
+    .screen {
+      //margin: auto;
+      min-width: 0px;
+      min-height: 0px;
+      display: inline-block;
+      position: relative;
+    }
 
     #buttonContainer {
       position: absolute;
+      display: flex;
+      gap: 5px;
       top: 10px;
       right: 10px;
       user-select: none;
@@ -36,12 +49,9 @@
   </style>
 </head>
 <body>
-  <div style="display: flex;">
+  <div class="screen">
     <canvas id="gameCanvas"></canvas>
     <div id="buttonContainer">
-      <button id="pauseButton">pause</button>
-      <button id="jumpToggleButton">toggle jumping</button>
-    </div>
   </div>
   <script src="main.js"></script>
 </body>
