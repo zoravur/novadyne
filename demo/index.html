@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2D Canvas Playground</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+
+
+    #buttonContainer {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background: #333;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    button:hover {
+      background: #555;
+    }
+  </style>
+</head>
+<body>
+  <div style="display: flex;">
+    <canvas id="gameCanvas"></canvas>
+    <div id="buttonContainer">
+      <button id="pauseButton">pause</button>
+      <button id="jumpToggleButton">toggle jumping</button>
+    </div>
+  </div>
+  <script src="main.js"></script>
+</body>
+</html>
+
