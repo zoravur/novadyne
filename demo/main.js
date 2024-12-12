@@ -56,6 +56,48 @@ class Explosion {
   }
 }
 
+function drawPieSlice(ctx, centerX, centerY, outerRadius, innerRadius, color, startAngle, endAngle) {
+  ctx.beginPath();
+
+  // move to the starting point on the outer radius
+  ctx.arc(centerX, centerY, outerRadius, startAngle, endAngle);
+
+  // if inner radius is greater than 0, connect to the inner circle
+  if (innerRadius > 0) {
+    // draw a line to the start point on the inner radius
+    ctx.arc(centerX, centerY, innerRadius, endAngle, startAngle, true);
+  } else {
+    // if no inner radius, close the path to the center
+    ctx.lineTo(centerX, centerY);
+  }
+
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+function drawTerraforming(ctx, planet) {
+  let [centerX, centerY] = [planet.x, planet.y]
+
+  let endAngle = planet.terraforming.completion * 2 * Math.PI; // goes from -2*Math.PI -- 2*Math.PI
+  let startAngle = 0;
+
+  // transform to start at top
+  endAngle = Math.PI / 2 - endAngle;
+  startAngle = Math.PI / 2 - startAngle;
+
+  [startAngle, endAngle] = [Math.min(startAngle, endAngle), Math.max(startAngle, endAngle)];
+
+  let outerRadius = planet.size * 1.5;
+  let innerRadius = planet.size * 1.4;
+
+  let color = teamColorMap[planet.terraforming.team];
+
+  drawPieSlice(ctx, centerX, centerY, outerRadius, innerRadius, color, startAngle, endAngle);
+
+  //drawPieSlice(ctx, centerX, centerY, outerRadius, innerRadius, color, startAngle, Math.PI/2);
+}
+
 /// EXAMPLE USAGE
 // const canvas = document.getElementById('canvas');
 // const ctx = canvas.getContext('2d');
@@ -140,12 +182,14 @@ const level1 = {
     x: 500,
     y: 300,
     team: 'BLUE',
+    terraforming: {team: 'BLUE', completion: 1},
     size: 40,
     color: randomColor(planetRandom),
   }, {
     x: 700,
     y: 650,
     team: 'RED',
+    terraforming: {team: 'RED', completion: 1},
     size: 30,
     color: randomColor(planetRandom),
   }],
@@ -158,59 +202,69 @@ const level2 = {
     x: 1247,
     y: 419,
     team: 'RED',
+    terraforming: {team: 'RED', completion: 1},
     size: 90,
     color: randomColor(planetRandom),
   }, {
     x: 900,
     y: 500,
     team: 'RED',
+    terraforming: {team: 'RED', completion: 1},
     size: 100,
     color: randomColor(planetRandom),
   }, {
     x: 615,
     y: 277,
     team: 'RED',
+    terraforming: {team: 'RED', completion: 1},
     size: 75,
     color: randomColor(planetRandom),
   }, {
     x: 297,
     y: 754,
     team: 'BLUE',
+    terraforming: {team: 'BLUE', completion: 1},
     size: 30,
     color: randomColor(planetRandom),
   }, {
     x: 503,
     y: 616,
     team: 'BLUE',
+    terraforming: {team: 'BLUE', completion: 1},
     size: 30,
     color: randomColor(planetRandom),
   }, {
     x: 860,
     y: 797,
     team: 'BLUE',
+    terraforming: {team: 'BLUE', completion: 1},
     size: 30,
     color: randomColor(planetRandom),
   }, {
     x: 968,
     y: 1000,
     team: 'BLUE',
+    terraforming: {team: 'BLUE', completion: 1},
     size: 30,
     color: randomColor(planetRandom),
   }, {
     x: 591,
     y: 845,
     team: 'BLUE',
+    terraforming: {team: 'BLUE', completion: 1},
     size: 40,
     color: randomColor(planetRandom),
   }, {
     x: 1258,
     y: 822,
     team: 'BLUE',
+    terraforming: {team: 'BLUE', completion: 1},
     size: 40,
     color: randomColor(planetRandom),
   }],
   ships: [],
 }
+
 const levels = [level1, level2];
 
 //////////// CONSTANTS ///////////////
@@ -221,6 +275,7 @@ const NUM_PLANETS = 5;
 const WORLD_SEED = 7;
 const COMBAT_RATE = 20;
 const BASE_PRODUCTION_RATE = 1;
+const BASE_TERRAFORMING_RATE = 500; // smaller is faster
 const LEVEL_NUM = 2;
 
 // seeds i like: [6, 7, 8, 9]
@@ -332,7 +387,7 @@ function update() {
   });
 
   /////////////////// model combat and generation ///////////////////////////
-  if (tickCount % 20 === 0) {
+  if (tickCount % 1 === 0) {
     //////////// compute statistics //////////////////
     let totalPerTeam = Object.fromEntries(Object.keys(teamColorMap).map(team => [team, 0]))
     let teamCapacities = planets.reduce((acc, planet) => { 
@@ -356,24 +411,27 @@ function update() {
     ////////////// update ///////////////////////////
     let newShips = [...ships];
     buckets.forEach((bucket, planetIdx) => {
+
       /// combat ////
       let x = bucket.ships.length;
       const teams = Object.keys(bucket.counts);
-      actionProb = x > 0 ? Math.exp((x - 30)/30) / (1 + Math.exp((x-30)/ 30)) : 0;
-      if (seededRandom() < actionProb) {
-        const hitter = fastSoftmaxSample(teams.map(t => bucket.counts[t]));
-        teams.splice(hitter, 1);
-        const hittee = fastSoftmaxSample(teams.map(t => bucket.counts[t]));
-        
-        //console.log('hittee ===', hittee);
-        const selectedTeam = teams[hittee];
-        for (let i = bucket.ships.length-1; i >= 0; --i) {
-          let shipIdx = bucket.ships[i];
-          if (ships[shipIdx].team === selectedTeam && ships[shipIdx].orbiting) {
-            newShips.splice(shipIdx, 1);
-            x -= 1;
-            explosions.push(new Explosion(ships[shipIdx].x, ships[shipIdx].y));
-            break;
+      if (tickCount % 20 === 0) {
+        actionProb = x > 0 ? Math.exp((x - 30)/30) / (1 + Math.exp((x-30)/ 30)) : 0;
+        if (seededRandom() < actionProb) {
+          const hitter = fastSoftmaxSample(teams.map(t => bucket.counts[t]));
+          teams.splice(hitter, 1);
+          const hittee = fastSoftmaxSample(teams.map(t => bucket.counts[t]));
+          
+          //console.log('hittee ===', hittee);
+          const selectedTeam = teams[hittee];
+          for (let i = bucket.ships.length-1; i >= 0; --i) {
+            let shipIdx = bucket.ships[i];
+            if (ships[shipIdx].team === selectedTeam && ships[shipIdx].orbiting) {
+              newShips.splice(shipIdx, 1);
+              x -= 1;
+              explosions.push(new Explosion(ships[shipIdx].x, ships[shipIdx].y));
+              break;
+            }
           }
         }
       }
@@ -383,34 +441,54 @@ function update() {
         if (drawDebug) {
           // console.log(bucket.counts[t], x, t);
         }
+
         if (bucket.counts[t] && bucket.counts[t] >= x) {
-          // planet planetIdx is occupied solely by team t
-          planets[planetIdx].team = t;
+          // terraforming will be modified
+          // planet.terraforming == {team: _____, completion: ______}
+          // completion is greater than or equal to 0 at all times
+
+          const planet = planets[planetIdx];
+          if (planet.terraforming.team === t) {
+            planet.terraforming.completion += bucket.counts[t]/BASE_TERRAFORMING_RATE/planet.size;
+            if (planet.terraforming.completion >= 1) {
+              planet.terraforming.completion = 1;
+              planet.team = t;
+            }
+          } else if (planet.terraforming.team !== t) {
+            planet.terraforming.completion -= bucket.counts[t]/BASE_TERRAFORMING_RATE/planet.size;
+            planet.terraforming.completion = Math.max(planet.terraforming.completion, 0);
+            if (planet.terraforming.completion === 0) {
+              planet.team = null;
+              planet.terraforming.team = t;
+            }
+          }
         }
       });
 
-      /// production / generation
+      /// production / generation / terraforming
       // generation is constant
-      if (totalPerTeam[planets[planetIdx].team] < teamCapacities[planets[planetIdx].team]) {
-        // if we are over capacity, do not produce
-        const productionRate = planets[planetIdx].size;
-        const baseRate = Math.floor(500 / BASE_PRODUCTION_RATE);
-        //console.log('generation');
-        // console.log(tickCount / 20, Math.floor(baseRate / productionRate));
-        if ((tickCount / 20) % (Math.ceil(baseRate / productionRate)+1) === 0) {
-          // if (planetIdx === 0) {
-          //   console.log(totalPerTeam, teamCapacities);
-          // }
-          const orbitRadius = 1 / (seededRandom() * 0.5 + 0.3);
-          newShips.push({ 
-            x: planets[planetIdx].x,
-            y: planets[planetIdx].y + planets[planetIdx].size * Math.sqrt(orbitRadius),
-            orbitRadius,
-            orbiting: true,
-            team: planets[planetIdx].team,
-            color: teamColorMap[planets[planetIdx].team],
-            planetIdx,
-          });
+      if (planets[planetIdx].terraforming.completion === 1) {
+        if (totalPerTeam[planets[planetIdx].team] < teamCapacities[planets[planetIdx].team]) {
+          // if we are over capacity, do not produce
+          const productionRate = planets[planetIdx].size;
+          const baseRate = Math.floor(500 / BASE_PRODUCTION_RATE);
+          //console.log('generation');
+          // console.log(tickCount / 20, Math.floor(baseRate / productionRate));
+          if ((tickCount / 20) % (Math.ceil(baseRate / productionRate)+1) === 0) {
+            // if (planetIdx === 0) {
+            //   console.log(totalPerTeam, teamCapacities);
+            // }
+            const orbitRadius = 1 / (seededRandom() * 0.5 + 0.3);
+            newShips.push({ 
+              x: planets[planetIdx].x,
+              y: planets[planetIdx].y + planets[planetIdx].size * Math.sqrt(orbitRadius),
+              orbitRadius,
+              orbiting: true,
+              team: planets[planetIdx].team,
+              color: teamColorMap[planets[planetIdx].team],
+              planetIdx,
+            });
+          }
         }
       }
     });
@@ -499,12 +577,16 @@ function update() {
     ctx.fill();
     ctx.closePath();
 
+    // draw the terraforming status:
+    if (planet.terraforming.completion < 1) {
+      drawTerraforming(ctx, planet);
+    }
 
     // draw the carrying capacity (planet size) at the center
     ctx.font = "20px Arial"; // set font size and style
     ctx.textAlign = "center"; // center text horizontally
     ctx.textBaseline = "middle"; // center text vertically
-    ctx.fillStyle = teamColorMap[planet.team]; // text color
+    ctx.fillStyle = teamColorMap[planet.team] || 'white'; // text color
     ctx.strokeStyle = "black"; // outline color
     ctx.lineWidth = 2; // outline thickness
 
