@@ -94,8 +94,6 @@ function drawTerraforming(ctx, planet) {
   let color = teamColorMap[planet.terraforming.team];
 
   drawPieSlice(ctx, centerX, centerY, outerRadius, innerRadius, color, startAngle, endAngle);
-
-  //drawPieSlice(ctx, centerX, centerY, outerRadius, innerRadius, color, startAngle, Math.PI/2);
 }
 
 /// EXAMPLE USAGE
@@ -133,7 +131,6 @@ function drawTerraforming(ctx, planet) {
 // render(); 
 
 //// UTIL FUNCTIONS /////////
-
 function createSeededRandom(seed) {
   let state = seed;
   return function () {
@@ -265,7 +262,81 @@ const level2 = {
   ships: [],
 }
 
-const levels = [level1, level2];
+const level3 = {
+  planets: [{
+    x: 300,
+    y: 600,
+    team: 'BLUE',
+    terraforming: {team: 'BLUE', completion: 1},
+    size: 40,
+    color: randomColor(planetRandom),
+  }, {
+    x: 700,
+    y: 400,
+    team: null,
+    terraforming: {team: null, completion: 0},
+    size: 30,
+    color: randomColor(planetRandom),
+  }, {
+    x: 700,
+    y: 800,
+    team: null,
+    terraforming: {team: null, completion: 0},
+    size: 30,
+    color: randomColor(planetRandom),
+  }, {
+    x: 1100,
+    y: 800,
+    team: null,
+    terraforming: {team: null, completion: 0},
+    size: 30,
+    color: randomColor(planetRandom),
+  }, {
+    x: 1100,
+    y: 400,
+    team: null,
+    terraforming: {team: null, completion: 0},
+    size: 30,
+    color: randomColor(planetRandom),
+  }, {
+    x: 1500,
+    y: 600,
+    team: 'RED',
+    terraforming: {team: 'RED', completion: 1},
+    size: 30,
+    color: randomColor(planetRandom),
+  }],
+  ships: [],
+}
+
+const level4 = {
+  planets: [{
+    x: 700,
+    y: 800,
+    team: 'BLUE',
+    terraforming: {team: 'BLUE', completion: 1},
+    size: 30,
+    color: randomColor(planetRandom),
+  }, {
+    x: 1200,
+    y: 800,
+    team: 'YELLOW',
+    terraforming: {team: 'YELLOW', completion: 1},
+    size: 30,
+    color: randomColor(planetRandom),
+  }, {
+    x: 950,
+    y: 400,
+    team: 'RED',
+    terraforming: {team: 'RED', completion: 1},
+    size: 30,
+    color: randomColor(planetRandom),
+  }],
+  ships: [],
+};
+
+
+const levels = [level1, level2, level3, level4];
 
 //////////// CONSTANTS ///////////////
 const FRAMERATE = 60; // DO NOT MODIFY
@@ -276,7 +347,7 @@ const WORLD_SEED = 7;
 const COMBAT_RATE = 20;
 const BASE_PRODUCTION_RATE = 1;
 const BASE_TERRAFORMING_RATE = 500; // smaller is faster
-const LEVEL_NUM = 2;
+const LEVEL_NUM = 3;
 
 // seeds i like: [6, 7, 8, 9]
 // Example usage
@@ -300,6 +371,7 @@ let explosions = [];
 const teamColorMap = {
   BLUE: `hsl(${0.55 * 360}, 80%, 60%)`,
   RED: `hsl(${0.05 * 360}, 80%, 60%)`,
+  YELLOW: `hsl(${0.35 * 360}, 80%, 60%)`,
 };
 
 // create some random planets
@@ -772,6 +844,12 @@ addButton('play lvl1', 'lvl1Select', e => {
 addButton('play lvl2', 'lvl2Select', e => {
   planets = level2.planets;
   ships = level2.ships;
+  tickCount = 0;
+});
+
+addButton('play lvl3', 'lvl3Select', e => {
+  planets = level3.planets;
+  ships = level3.ships;
   tickCount = 0;
 });
 
