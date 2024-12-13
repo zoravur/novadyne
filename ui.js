@@ -9,7 +9,8 @@ function addButton(text, id, onclick) {
 }
   
 
-export function buildUi(preferences, selectLevel) {
+export function buildUi(preferences, selectLevel, update) {
+
     addButton('play lvl1', 'lvl1Select', e => {
         selectLevel(1);
 
@@ -24,8 +25,8 @@ export function buildUi(preferences, selectLevel) {
     });
     
     addButton('pause', 'pauseButton', e => {
-      preferences.paused = !paused;
-      e.target.innerHTML = paused ? 'play' : 'pause';
+      preferences.paused = !preferences.paused;
+      e.target.innerHTML = preferences.paused ? 'play' : 'pause';
       if (!preferences.paused) {
         update();
       }

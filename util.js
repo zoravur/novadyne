@@ -41,6 +41,14 @@ export function computeSquaredDistance(entity1, entity2) {
     const {x: w, y: z} = entity2;
     return (x-w)*(x-w) + (y-z)*(y-z);
 }
+
+export function fisherYates(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]]; // swap
+    }
+    return array; 
+}
   
 
 export function randomColor(randomFunc) {

@@ -7,7 +7,7 @@ export const WORLD_SEED = 7;
 export const COMBAT_RATE = 20;
 export const BASE_PRODUCTION_RATE = 1;
 export const BASE_TERRAFORMING_RATE = 500; // smaller is faster
-export const LEVEL_NUM = 3;
+export const LEVEL_NUM = 2;
 
 export const teamColorMap = {
   BLUE: `hsl(${0.55 * 360}, 80%, 60%)`,

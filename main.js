@@ -24,6 +24,7 @@ import {
   computeSquaredDistance,
 } from "./util.js";
 import { buildUi } from './ui.js';
+import { RandomAI, GreedyAI, MixedAI } from "./ai.js";
 
 // seeds i like: [6, 7, 8, 9]
 // Example usage
@@ -37,12 +38,15 @@ canvas.width = 1800;
 canvas.height = 1300;
 
 // track planets and ships
-let planets = levels[LEVEL_NUM-1].planets; //level1.planets;
-let ships = levels[LEVEL_NUM-1].ships; //level1.ships;
+const globalGameState = {
+  planets: levels[LEVEL_NUM-1].planets,
+  ships: levels[LEVEL_NUM-1].ships,
+  tickCount: 0,
+}
+
 let hoveredPlanet = null;
 let selectedPlanets = [];
 let explosions = [];
-let tickCount = 0;
 let gameResult = null;
 
 const preferences = {
@@ -52,12 +56,12 @@ const preferences = {
 };
 
 function selectLevel(lvlNum) {
-  planets = levels[lvlNum-1].planets;
-  ships = levels[lvlNum-1].ships;
-  tickCount = 0;
+  globalGameState.planets = levels[lvlNum-1].planets;
+  globalGameState.ships = levels[lvlNum-1].ships;
+  globalGameState.tickCount = 0;
 }
 
-buildUi(preferences, selectLevel);
+buildUi(preferences, selectLevel, update);
 
 // create some random planets
 // let blueMass = 0;
@@ -73,14 +77,11 @@ buildUi(preferences, selectLevel);
 //   });
 // }
 
-function findClosestPlanet(w, z) {
-  const distances = planets.map(({x, y}) => (x - w)*(x-w) + (y-z)*(y-z));
-  let min = Math.min(...distances);
-  let idx = distances.findIndex(dist => dist == min);
-  return {planet: planets[idx], distance: min, idx };
-}
+
 
 function reassignFraction(pIdx1, pIdx2, team, frac = 0.6) {
+  const {ships, planets} = globalGameState;
+  
   const totalAt1 = ships.filter(({planetIdx, orbiting, team: shipTeam}) => 
     planetIdx === pIdx1 && orbiting && shipTeam===team).length;
   
@@ -93,19 +94,33 @@ function reassignFraction(pIdx1, pIdx2, team, frac = 0.6) {
   });
 }
 
+// let opponent = new GreedyAI(globalGameState, 'RED');
+// let opponentGreen = new GreedyAI(globalGameState, 'YELLOW');
+
+let opponents = Object.keys(teamColorMap)
+  //.filter(team => team !== 'BLUE')
+  .map(team => new MixedAI(globalGameState, team));
+
 // main game loop
 function update() {
-  tickCount += SIM_FACTOR;
-  
-  if (tickCount % 60 === 0) {
-    const idx1 = Math.floor(seededRandom() * planets.length);
-    let idx2 = idx1;
-    
-    while (idx2 == idx1) {
-      idx2 = Math.floor(seededRandom() * planets.length);
-    }
+  const { planets, ships } = globalGameState;
 
-    if (preferences.jumping) reassignFraction(idx1, idx2, 'RED', 0.8);
+  globalGameState.tickCount += SIM_FACTOR;
+  
+  if (globalGameState.tickCount % 60 === 0 && preferences.jumping) {
+    for (let opponent of opponents) {
+      let { fromPlanet, toPlanet, fractionToMove } = opponent.sampleAction();
+  
+      reassignFraction(fromPlanet, toPlanet, opponent.team, fractionToMove);
+    }
+    // const idx1 = Math.floor(seededRandom() * planets.length);
+    // let idx2 = idx1;
+    
+    // while (idx2 == idx1) {
+    //   idx2 = Math.floor(seededRandom() * planets.length);
+    // }
+
+    // if (preferences.jumping) reassignFraction(idx1, idx2, 'RED', 0.8);
   }
 
   /// ship movement -- this code is super janky
@@ -138,7 +153,7 @@ function update() {
   });
 
   /////////////////// model combat and generation ///////////////////////////
-  if (tickCount % 1 === 0) {
+  if (globalGameState.tickCount % 1 === 0) {
     //////////// compute statistics //////////////////
     let totalPerTeam = Object.fromEntries(Object.keys(teamColorMap).map(team => [team, 0]))
     let teamCapacities = planets.reduce((acc, planet) => { 
@@ -166,7 +181,7 @@ function update() {
       /// combat ////
       let x = bucket.ships.length;
       const teams = Object.keys(bucket.counts);
-      if (tickCount % 20 === 0) {
+      if (globalGameState.tickCount % 20 === 0) {
         let actionProb = x > 0 ? Math.exp((x - 30)/30) / (1 + Math.exp((x-30)/ 30)) : 0;
         if (seededRandom() < actionProb) {
           const hitter = fastSoftmaxSample(teams.map(t => bucket.counts[t]));
@@ -224,8 +239,8 @@ function update() {
           const productionRate = planets[planetIdx].size;
           const baseRate = Math.floor(500 / BASE_PRODUCTION_RATE);
           //console.log('generation');
-          // console.log(tickCount / 20, Math.floor(baseRate / productionRate));
-          if ((tickCount / 20) % (Math.ceil(baseRate / productionRate)+1) === 0) {
+          // console.log(globalGameState.tickCount / 20, Math.floor(baseRate / productionRate));
+          if ((globalGameState.tickCount / 20) % (Math.ceil(baseRate / productionRate)+1) === 0) {
             // if (planetIdx === 0) {
             //   console.log(totalPerTeam, teamCapacities);
             // }
@@ -243,14 +258,21 @@ function update() {
         }
       }
     });
-    ships = newShips;
+    globalGameState.ships = newShips;
   }
 
   const blueCount = ships.filter(ship => ship.team === 'BLUE').length;
-  if (blueCount === ships.length && tickCount > 500) {
+  if (blueCount === ships.length && globalGameState.tickCount > 500) {
     gameResult = 'VICTORY';
-  } else if (blueCount === 0 && tickCount > 500) {
+  } else if (blueCount === 0 && globalGameState.tickCount > 500) {
     gameResult = 'DEFEAT';
+  }
+
+  if (gameResult) {
+    console.log('YEEEEE');
+    for (let team of Object.keys(teamColorMap)) {
+      reassignFraction(Math.floor(seededRandom() * planets.length), Math.floor(seededRandom() * planets.length), team, 0.3);
+    }
   }
 
   // Step and draw each explosion
@@ -266,6 +288,14 @@ function update() {
 
   if (preferences.paused === true) return;
   requestAnimationFrame(update);
+}
+
+function findClosestPlanet(w, z) {
+  const { planets } = globalGameState;
+  const distances = planets.map(({x, y}) => (x - w)*(x-w) + (y-z)*(y-z));
+  let min = Math.min(...distances);
+  let idx = distances.findIndex(dist => dist == min);
+  return {planet: planets[idx], distance: min, idx };
 }
 
 // add a ship on click
