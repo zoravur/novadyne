@@ -1,353 +1,31 @@
-class Explosion {
-  constructor(x, y) {
-    this.x = x;
-    this.y = y;
-    this.time = 0;
-    this.baseRadius = 12;
-    this.minScale = 0.05;
-    this.maxScale = 1;
-    this.completed = false;
-  }
-  
-  step() {
-    if (this.completed) return;
-    this.time += 0.12;
-    if (this.time >= 2 * Math.PI) {
-      this.completed = true;
-    }
-  }
-  
-  draw(ctx) {
-    if (this.completed) return;
-    
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    
-    const offsetTime = this.time - Math.PI / 2;
-    const sineValue = Math.sin(offsetTime);
-    const scale = this.minScale + (sineValue + 1) * (this.maxScale - this.minScale) / 2;
-    const currentRadius = this.baseRadius * scale;
-    
-    const colorMix = (-Math.cos(offsetTime/1.5) + 1) / 2;
-    const currentHue = 60 - (colorMix * 60);
-    
-    ctx.beginPath();
-    for (let i = 0; i < 4; i++) {
-      const angle = (i * Math.PI) / 2;
-      const x = currentRadius * Math.cos(angle);
-      const y = currentRadius * Math.sin(angle);
-      
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.quadraticCurveTo(0, 0, x, y);
-      }
-    }
-    ctx.quadraticCurveTo(0, 0, currentRadius, 0);
-    
-    ctx.fillStyle = `hsl(${currentHue}, 100%, 50%)`;
-    ctx.fill();
-    
-    ctx.restore();
-  }
-  
-  isCompleted() {
-    return this.completed;
-  }
-}
+"use strict";
 
-function drawPieSlice(ctx, centerX, centerY, outerRadius, innerRadius, color, startAngle, endAngle) {
-  ctx.beginPath();
+import {
+  FRAMERATE,
+  SHIP_SPEED,
+  SIM_FACTOR,
+  NUM_PLANETS,
+  WORLD_SEED,
+  COMBAT_RATE,
+  BASE_PRODUCTION_RATE,
+  BASE_TERRAFORMING_RATE,
+  LEVEL_NUM,
+  teamColorMap,
+} from "./constants.js";
 
-  // move to the starting point on the outer radius
-  ctx.arc(centerX, centerY, outerRadius, startAngle, endAngle);
-
-  // if inner radius is greater than 0, connect to the inner circle
-  if (innerRadius > 0) {
-    // draw a line to the start point on the inner radius
-    ctx.arc(centerX, centerY, innerRadius, endAngle, startAngle, true);
-  } else {
-    // if no inner radius, close the path to the center
-    ctx.lineTo(centerX, centerY);
-  }
-
-  ctx.closePath();
-  ctx.fillStyle = color;
-  ctx.fill();
-}
-
-function drawTerraforming(ctx, planet) {
-  let [centerX, centerY] = [planet.x, planet.y]
-
-  let endAngle = planet.terraforming.completion * 2 * Math.PI; // goes from -2*Math.PI -- 2*Math.PI
-  let startAngle = 0;
-
-  // transform to start at top
-  endAngle = Math.PI / 2 - endAngle;
-  startAngle = Math.PI / 2 - startAngle;
-
-  [startAngle, endAngle] = [Math.min(startAngle, endAngle), Math.max(startAngle, endAngle)];
-
-  let outerRadius = planet.size * 1.5;
-  let innerRadius = planet.size * 1.4;
-
-  let color = teamColorMap[planet.terraforming.team];
-
-  drawPieSlice(ctx, centerX, centerY, outerRadius, innerRadius, color, startAngle, endAngle);
-}
-
-/// EXAMPLE USAGE
-// const canvas = document.getElementById('canvas');
-// const ctx = canvas.getContext('2d');
-
-// // Array to store active explosions
-// let explosions = [];
-// 
-// // Click handler
-// canvas.addEventListener('click', (e) => {
-//   const rect = canvas.getBoundingClientRect();
-//   const x = e.clientX - rect.left;
-//   const y = e.clientY - rect.top;
-//   explosions.push(new Explosion(x, y));
-// });
-// 
-// // Animation loop
-// function render() {
-//   ctx.clearRect(0, 0, canvas.width, canvas.height);
-//   
-//   // Step and draw each explosion
-//   for (const explosion of explosions) {
-//     explosion.step();
-//     explosion.draw(ctx);
-//   }
-//   
-//   // Remove completed explosions
-//   explosions = explosions.filter(exp => !exp.isCompleted());
-//   
-//   requestAnimationFrame(render);
-// }
-// 
-// // Start animation loop
-// render(); 
-
-//// UTIL FUNCTIONS /////////
-function createSeededRandom(seed) {
-  let state = seed;
-  return function () {
-    // LCG constants
-    state = (state * 1664525 + 1013904223) % 4294967296;
-    return (state >>> 0) / 4294967296; // Convert to a [0, 1) float
-  };
-}
-
-function normalizeVec(x, y) {
-  const d = Math.sqrt(x*x + y*y);
-  return {x: x/d, y: y/d};
-}
-
-function fastSoftmaxSample(arr) {
-  const minVal = Math.min(...arr);
-  const maxVal = Math.max(...arr);
-
-  // normalize to [0, 1]
-  const normalized = arr.map(v => (v - minVal) / (maxVal - minVal));
-  const sum = normalized.reduce((acc, v) => acc + v, 0);
-  const probabilities = normalized.map(v => v / sum); // normalize to sum to 1
-
-  // sample an index based on the probabilities
-  const random = Math.random();
-  let cumulative = 0;
-
-  for (let i = 0; i < probabilities.length; i++) {
-    cumulative += probabilities[i];
-    if (random < cumulative) {
-      return i; // return the index
-    }
-  }
-
-  return probabilities.length - 1; // fallback in case of rounding errors
-}
-
-function randomColor(randomFunc) {
-  return `hsl(${randomFunc() * 360}, 65%, 55%)`;
-}
-const planetRandom = createSeededRandom(1);
-
-// LEVEL 1 COMPLETE
-const level1 = {
-  planets: [{
-    x: 500,
-    y: 300,
-    team: 'BLUE',
-    terraforming: {team: 'BLUE', completion: 1},
-    size: 40,
-    color: randomColor(planetRandom),
-  }, {
-    x: 700,
-    y: 650,
-    team: 'RED',
-    terraforming: {team: 'RED', completion: 1},
-    size: 30,
-    color: randomColor(planetRandom),
-  }],
-  ships: []
-};
-
-// LEVEL 2 COMPLETE
-const level2 = {
-  planets: [{
-    x: 1247,
-    y: 419,
-    team: 'RED',
-    terraforming: {team: 'RED', completion: 1},
-    size: 90,
-    color: randomColor(planetRandom),
-  }, {
-    x: 900,
-    y: 500,
-    team: 'RED',
-    terraforming: {team: 'RED', completion: 1},
-    size: 100,
-    color: randomColor(planetRandom),
-  }, {
-    x: 615,
-    y: 277,
-    team: 'RED',
-    terraforming: {team: 'RED', completion: 1},
-    size: 75,
-    color: randomColor(planetRandom),
-  }, {
-    x: 297,
-    y: 754,
-    team: 'BLUE',
-    terraforming: {team: 'BLUE', completion: 1},
-    size: 30,
-    color: randomColor(planetRandom),
-  }, {
-    x: 503,
-    y: 616,
-    team: 'BLUE',
-    terraforming: {team: 'BLUE', completion: 1},
-    size: 30,
-    color: randomColor(planetRandom),
-  }, {
-    x: 860,
-    y: 797,
-    team: 'BLUE',
-    terraforming: {team: 'BLUE', completion: 1},
-    size: 30,
-    color: randomColor(planetRandom),
-  }, {
-    x: 968,
-    y: 1000,
-    team: 'BLUE',
-    terraforming: {team: 'BLUE', completion: 1},
-    size: 30,
-    color: randomColor(planetRandom),
-  }, {
-    x: 591,
-    y: 845,
-    team: 'BLUE',
-    terraforming: {team: 'BLUE', completion: 1},
-    size: 40,
-    color: randomColor(planetRandom),
-  }, {
-    x: 1258,
-    y: 822,
-    team: 'BLUE',
-    terraforming: {team: 'BLUE', completion: 1},
-    size: 40,
-    color: randomColor(planetRandom),
-  }],
-  ships: [],
-}
-
-const level3 = {
-  planets: [{
-    x: 300,
-    y: 600,
-    team: 'BLUE',
-    terraforming: {team: 'BLUE', completion: 1},
-    size: 40,
-    color: randomColor(planetRandom),
-  }, {
-    x: 700,
-    y: 400,
-    team: null,
-    terraforming: {team: null, completion: 0},
-    size: 30,
-    color: randomColor(planetRandom),
-  }, {
-    x: 700,
-    y: 800,
-    team: null,
-    terraforming: {team: null, completion: 0},
-    size: 30,
-    color: randomColor(planetRandom),
-  }, {
-    x: 1100,
-    y: 800,
-    team: null,
-    terraforming: {team: null, completion: 0},
-    size: 30,
-    color: randomColor(planetRandom),
-  }, {
-    x: 1100,
-    y: 400,
-    team: null,
-    terraforming: {team: null, completion: 0},
-    size: 30,
-    color: randomColor(planetRandom),
-  }, {
-    x: 1500,
-    y: 600,
-    team: 'RED',
-    terraforming: {team: 'RED', completion: 1},
-    size: 30,
-    color: randomColor(planetRandom),
-  }],
-  ships: [],
-}
-
-const level4 = {
-  planets: [{
-    x: 700,
-    y: 800,
-    team: 'BLUE',
-    terraforming: {team: 'BLUE', completion: 1},
-    size: 30,
-    color: randomColor(planetRandom),
-  }, {
-    x: 1200,
-    y: 800,
-    team: 'YELLOW',
-    terraforming: {team: 'YELLOW', completion: 1},
-    size: 30,
-    color: randomColor(planetRandom),
-  }, {
-    x: 950,
-    y: 400,
-    team: 'RED',
-    terraforming: {team: 'RED', completion: 1},
-    size: 30,
-    color: randomColor(planetRandom),
-  }],
-  ships: [],
-};
-
-
-const levels = [level1, level2, level3, level4];
-
-//////////// CONSTANTS ///////////////
-const FRAMERATE = 60; // DO NOT MODIFY
-const SHIP_SPEED = 1;
-const SIM_FACTOR = 2;
-const NUM_PLANETS = 5;
-const WORLD_SEED = 7;
-const COMBAT_RATE = 20;
-const BASE_PRODUCTION_RATE = 1;
-const BASE_TERRAFORMING_RATE = 500; // smaller is faster
-const LEVEL_NUM = 3;
+import { Explosion, drawTerraforming, drawShip, render } from "./graphics.js";
+import { levels } from "./levels.js";
+import {
+  createSeededRandom,
+  normalizeVec,
+  fastSoftmaxSample,
+  randomColor,
+  planetRandom,
+  computeSquaredDistance,
+} from "./util.js";
+import { buildUi } from './ui.js';
+import { RandomAI, GreedyAI, MixedAI, CleverAI, DefensiveAI, NullAI } from "./ai.js";
+import { GameStatistics } from './gameStatistics.js';
 
 // seeds i like: [6, 7, 8, 9]
 // Example usage
@@ -361,18 +39,40 @@ canvas.width = 1800;
 canvas.height = 1300;
 
 // track planets and ships
-let planets = levels[LEVEL_NUM-1].planets; //level1.planets;
-let ships = levels[LEVEL_NUM-1].ships; //level1.ships;
+const globalGameState = {
+  planets: levels[LEVEL_NUM-1].planets,
+  ships: levels[LEVEL_NUM-1].ships,
+  tickCount: 0,
+  gameResult: null,
+}
+
 let hoveredPlanet = null;
 let selectedPlanets = [];
 let explosions = [];
 
-
-const teamColorMap = {
-  BLUE: `hsl(${0.55 * 360}, 80%, 60%)`,
-  RED: `hsl(${0.05 * 360}, 80%, 60%)`,
-  YELLOW: `hsl(${0.35 * 360}, 80%, 60%)`,
+const preferences = {
+  paused: false,
+  jumping: true,
+  drawDebug: false,
 };
+
+function selectLevel(lvlNum) {
+  globalGameState.planets = levels[lvlNum-1].planets;
+  globalGameState.ships = levels[lvlNum-1].ships;
+  globalGameState.tickCount = 0;
+  globalGameState.gameResult = null;
+}
+
+buildUi(preferences, selectLevel, update);
+
+const gameStats = new GameStatistics(globalGameState);
+
+// let opponent = new GreedyAI(globalGameState, 'RED');
+// let opponentGreen = new GreedyAI(globalGameState, 'YELLOW');
+
+let opponents = Object.keys(teamColorMap)
+  //.filter(team => team !== 'BLUE')
+  .map(team => team === 'BLUE' ? new NullAI(globalGameState, team, gameStats) : new CleverAI(globalGameState, team, gameStats));
 
 // create some random planets
 // let blueMass = 0;
@@ -388,21 +88,13 @@ const teamColorMap = {
 //   });
 // }
 
-function findClosestPlanet(w, z) {
-  const distances = planets.map(({x, y}) => (x - w)*(x-w) + (y-z)*(y-z));
-  let min = Math.min(...distances);
-  let idx = distances.findIndex(dist => dist == min);
-  return {planet: planets[idx], distance: min, idx };
-}
 
-function computeSquaredDistance(entity1, entity2) {
-  const {x, y} = entity1;
-  const {x: w, y: z} = entity2;
-  return (x-w)*(x-w) + (y-z)*(y-z);
-}
 
 function reassignFraction(pIdx1, pIdx2, team, frac = 0.6) {
-  const totalAt1 = ships.filter(({planetIdx, orbiting, team: shipTeam}) => planetIdx === pIdx1 && orbiting && shipTeam===team).length;
+  const {ships, planets} = globalGameState;
+  
+  const totalAt1 = ships.filter(({planetIdx, orbiting, team: shipTeam}) => 
+    planetIdx === pIdx1 && orbiting && shipTeam===team).length;
   
   let counter = 0;
   ships.forEach(ship => {
@@ -413,20 +105,27 @@ function reassignFraction(pIdx1, pIdx2, team, frac = 0.6) {
   });
 }
 
-let tickCount = 0;
+
 // main game loop
 function update() {
-  tickCount += SIM_FACTOR;
-  
-  if (tickCount % 60 === 0) {
-    const idx1 = Math.floor(seededRandom() * planets.length);
-    let idx2 = idx1;
-    
-    while (idx2 == idx1) {
-      idx2 = Math.floor(seededRandom() * planets.length);
-    }
+  const { planets, ships } = globalGameState;
 
-    if (jumping) reassignFraction(idx1, idx2, 'RED', 0.8);
+  globalGameState.tickCount += SIM_FACTOR;
+  
+  if (globalGameState.tickCount % 60 === 0 && preferences.jumping) {
+    for (let opponent of opponents) {
+      let { fromPlanet, toPlanet, fractionToMove } = opponent.sampleAction();
+  
+      reassignFraction(fromPlanet, toPlanet, opponent.team, fractionToMove);
+    }
+    // const idx1 = Math.floor(seededRandom() * planets.length);
+    // let idx2 = idx1;
+    
+    // while (idx2 == idx1) {
+    //   idx2 = Math.floor(seededRandom() * planets.length);
+    // }
+
+    // if (preferences.jumping) reassignFraction(idx1, idx2, 'RED', 0.8);
   }
 
   /// ship movement -- this code is super janky
@@ -459,26 +158,9 @@ function update() {
   });
 
   /////////////////// model combat and generation ///////////////////////////
-  if (tickCount % 1 === 0) {
+  if (globalGameState.tickCount % 1 === 0) {
     //////////// compute statistics //////////////////
-    let totalPerTeam = Object.fromEntries(Object.keys(teamColorMap).map(team => [team, 0]))
-    let teamCapacities = planets.reduce((acc, planet) => { 
-      acc[planet.team] = (acc[planet.team] || 0) + planet.size; 
-      return acc; 
-    }, {});
-
-    let buckets = Array.from({length: planets.length}, (_, idx) => ({  
-      ships: [], 
-      counts: Object.fromEntries(Object.keys(teamColorMap).map(team => [team, 0]))
-    }));
-    ships.forEach((ship, shipIdx) => {
-      if (ship.orbiting) {
-        buckets[ship.planetIdx].ships.push(shipIdx);
-        buckets[ship.planetIdx].counts[ship.team] = buckets[ship.planetIdx].counts[ship.team] + 1 || 1;
-      }
-      totalPerTeam[ship.team] = totalPerTeam[ship.team] + 1 || 1;
-    });
-
+    const { totalPerTeam, teamCapacities, buckets } = gameStats.computeStatistics();
 
     ////////////// update ///////////////////////////
     let newShips = [...ships];
@@ -487,8 +169,8 @@ function update() {
       /// combat ////
       let x = bucket.ships.length;
       const teams = Object.keys(bucket.counts);
-      if (tickCount % 20 === 0) {
-        actionProb = x > 0 ? Math.exp((x - 30)/30) / (1 + Math.exp((x-30)/ 30)) : 0;
+      if (globalGameState.tickCount % 20 === 0) {
+        let actionProb = x > 0 ? Math.exp((x - 30)/30) / (1 + Math.exp((x-30)/ 30)) : 0;
         if (seededRandom() < actionProb) {
           const hitter = fastSoftmaxSample(teams.map(t => bucket.counts[t]));
           teams.splice(hitter, 1);
@@ -510,7 +192,7 @@ function update() {
 
       /// allegiance switching ///
       teams.forEach(t => {
-        if (drawDebug) {
+        if (preferences.drawDebug) {
           // console.log(bucket.counts[t], x, t);
         }
 
@@ -545,8 +227,8 @@ function update() {
           const productionRate = planets[planetIdx].size;
           const baseRate = Math.floor(500 / BASE_PRODUCTION_RATE);
           //console.log('generation');
-          // console.log(tickCount / 20, Math.floor(baseRate / productionRate));
-          if ((tickCount / 20) % (Math.ceil(baseRate / productionRate)+1) === 0) {
+          // console.log(globalGameState.tickCount / 20, Math.floor(baseRate / productionRate));
+          if ((globalGameState.tickCount / 20) % (Math.ceil(baseRate / productionRate)+1) === 0) {
             // if (planetIdx === 0) {
             //   console.log(totalPerTeam, teamCapacities);
             // }
@@ -564,191 +246,43 @@ function update() {
         }
       }
     });
-    ships = newShips;
+    globalGameState.ships = newShips;
   }
 
-
-
-  //////////////////////// rendering / RENDERING /////////////////////////////
-  function drawShip(ctx, x, y, dx, dy, fill) {
-    const shipLength = 12; // length of the ship (long side)
-    const shipWidth = 8;  // width of the kite (short side)
-    const eccentricity = 0.6;
-
-    // calculate perpendicular direction for the ship's width
-    const perpX = -dy;
-    const perpY = dx;
-
-    // calculate points of the kite
-    const frontX = x + dx * shipLength; // front point
-    const backX = x - dx * shipLength * 0.5; // back point
-    const backLeftX = (backX * eccentricity + frontX * (1-eccentricity)) + perpX * shipWidth * 0.5; // left point of the back
-    const backRightX = (backX * eccentricity + frontX * (1-eccentricity)) - perpX * shipWidth * 0.5; // right point of the back
-
-    const frontY = y + dy * shipLength;
-    const backY = y - dy * shipLength * 0.5;
-    const backLeftY = (backY * eccentricity + frontY * (1-eccentricity)) + perpY * shipWidth * 0.5;
-    const backRightY = (backY * eccentricity + frontY * (1-eccentricity)) - perpY * shipWidth * 0.5;
-
-    // draw the kite
-    ctx.beginPath();
-    ctx.moveTo(frontX, frontY); // front point
-    ctx.lineTo(backLeftX, backLeftY); // back-left
-    ctx.lineTo(backX, backY); // back-center
-    ctx.lineTo(backRightX, backRightY); // back-right
-    ctx.closePath();
-
-    // fill and stroke the kite
-    ctx.fillStyle = fill;
-    //ctx.strokeStyle = "black";
-    ctx.lineWidth = 1;
-    ctx.fill();
-    //ctx.stroke();
+  const blueCount = ships.filter(ship => ship.team === 'BLUE').length;
+  if (blueCount === ships.length && globalGameState.tickCount > 500) {
+    globalGameState.gameResult = 'VICTORY';
+  } else if (blueCount === 0 && globalGameState.tickCount > 500) {
+    globalGameState.gameResult = 'DEFEAT';
   }
 
-  // redraw everything
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#222";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  
-  // draw planets; two passes so that highlighting is never on top of planet
-  planets.forEach((planet, idx) => {
-    if (hoveredPlanet === idx) {
-      ctx.beginPath();
-      ctx.arc(planet.x, planet.y, planet.size+10, 0, Math.PI * 2);
-      ctx.fillStyle = "#aaa9";
-      ctx.fill();
-      ctx.closePath();
-
+  if (globalGameState.gameResult) {
+    for (let team of Object.keys(teamColorMap)) {
+      reassignFraction(Math.floor(seededRandom() * planets.length), Math.floor(seededRandom() * planets.length), team, 0.3);
     }
-    if (selectedPlanets.includes(idx)) {
-      ctx.beginPath();
-      ctx.arc(planet.x, planet.y, planet.size+10, 0, Math.PI * 2);
-      ctx.fillStyle = "#aaa";
-      ctx.fill();
-      ctx.closePath();
-
-      ctx.beginPath();
-      ctx.moveTo(planet.x, planet.y);
-      ctx.lineTo(mouseX, mouseY);
-      ctx.strokeStyle = "#aaa";
-      ctx.lineWidth = 10;
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(mouseX, mouseY, 5, 0, Math.PI * 2);
-      ctx.fillStyle = "#aaa";
-      ctx.fill();
-      ctx.closePath();
-    }
-  });
-  planets.forEach((planet, idx) => {
-    ctx.beginPath();
-    ctx.arc(planet.x, planet.y, planet.size, 0, Math.PI * 2);
-    ctx.fillStyle = planet.color;
-    ctx.fill();
-    ctx.closePath();
-
-    // draw the terraforming status:
-    if (planet.terraforming.completion < 1) {
-      drawTerraforming(ctx, planet);
-    }
-
-    // draw the carrying capacity (planet size) at the center
-    ctx.font = "20px Arial"; // set font size and style
-    ctx.textAlign = "center"; // center text horizontally
-    ctx.textBaseline = "middle"; // center text vertically
-    ctx.fillStyle = teamColorMap[planet.team] || 'white'; // text color
-    ctx.strokeStyle = "black"; // outline color
-    ctx.lineWidth = 2; // outline thickness
-
-    // https://stackoverflow.com/a/63239887/8421788
-    const fix = ctx.measureText("H").actualBoundingBoxDescent / 2; // Notice Here
-
-    // draw outline first for contrast
-    ctx.strokeText(Math.floor(planet.size), planet.x, planet.y + fix);
-
-    // draw the text
-    ctx.fillText(Math.floor(planet.size), planet.x, planet.y + fix);
-  });
-
-  // draw ships
-  ships.forEach(ship => {
-    if (ship.orbiting) {
-      drawShip(ctx, ship.x, ship.y, ship.dy, -ship.dx, ship.color);
-    } else {
-      drawShip(ctx, ship.x, ship.y, ship.dx, ship.dy, ship.color);
-    }
-  });
+  }
 
   // Step and draw each explosion
   for (const explosion of explosions) {
     explosion.step();
-    explosion.draw(ctx);
   }
   
   // Remove completed explosions
   explosions = explosions.filter(exp => !exp.isCompleted());
-  
-  if (drawDebug) {
-    const gridSpacing = 100;
-    ctx.strokeStyle = "red"; // grid line color
-    ctx.lineWidth = 0.5; // thin grid lines
 
-    // draw vertical lines
-    for (let x = 0; x <= canvas.width; x += gridSpacing) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
-      ctx.stroke();
-    }
+  //////////////////////// rendering / RENDERING /////////////////////////////
+  render(ctx, canvas, planets, ships, explosions, hoveredPlanet, selectedPlanets, preferences.drawDebug, globalGameState.gameResult, mouseX, mouseY);
 
-    // draw horizontal lines
-    for (let y = 0; y <= canvas.height; y += gridSpacing) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
-      ctx.stroke();
-    }
-  }
-
-  const blueCount = ships.filter(ship => ship.team === 'BLUE').length;
-  if (blueCount === ships.length && tickCount > 500) { // use time to ignore the start of the game where there are no ships
-      ctx.font = "bold 72px Arial"; // big bold text
-      ctx.textAlign = "center"; // center the text horizontally
-      ctx.textBaseline = "middle"; // center the text vertically
-      ctx.fillStyle = "gold"; // main text color
-      ctx.strokeStyle = "black"; // outline color
-      ctx.lineWidth = 4; // outline thickness
-
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-
-      // draw outline for contrast
-      ctx.strokeText("VICTORY", centerX, centerY);
-
-      // draw the text
-      ctx.fillText("VICTORY", centerX, centerY);
-  } else if (blueCount === 0 && tickCount > 500) {
-    ctx.font = "bold 72px Arial"; // big bold text
-    ctx.textAlign = "center"; // center the text horizontally
-    ctx.textBaseline = "middle"; // center the text vertically
-    ctx.fillStyle = "red"; // main text color
-    ctx.strokeStyle = "black"; // outline color
-    ctx.lineWidth = 4; // outline thickness
-
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-
-    // draw outline for contrast
-    ctx.strokeText("DEFEAT", centerX, centerY);
-
-    // draw the text
-    ctx.fillText("DEFEAT", centerX, centerY);
-  }
-  
-  if (paused === true) return;
+  if (preferences.paused === true) return;
   requestAnimationFrame(update);
+}
+
+function findClosestPlanet(w, z) {
+  const { planets } = globalGameState;
+  const distances = planets.map(({x, y}) => (x - w)*(x-w) + (y-z)*(y-z));
+  let min = Math.min(...distances);
+  let idx = distances.findIndex(dist => dist == min);
+  return {planet: planets[idx], distance: min, idx };
 }
 
 // add a ship on click
@@ -791,7 +325,7 @@ canvas.addEventListener('mouseup', () => {
 });
 
 canvas.addEventListener('click', () => {
-  if (drawDebug) {
+  if (preferences.drawDebug) {
     console.log(JSON.stringify({mouseX, mouseY}));
   }
 });
@@ -822,57 +356,5 @@ canvas.addEventListener('mousemove', e=>{
     // }
   } 
 });
-
-
-function addButton(text, id, onclick) {
-  const btn = document.createElement('button');
-  btn.id = id;
-  btn.innerHTML = text;
-  document.getElementById('buttonContainer').appendChild(btn);
-  btn.addEventListener('click', onclick);
-}
-
-
-let paused = false;
-
-addButton('play lvl1', 'lvl1Select', e => {
-  planets = level1.planets;
-  ships = level1.ships;
-  tickCount = 0;
-});
-
-addButton('play lvl2', 'lvl2Select', e => {
-  planets = level2.planets;
-  ships = level2.ships;
-  tickCount = 0;
-});
-
-addButton('play lvl3', 'lvl3Select', e => {
-  planets = level3.planets;
-  ships = level3.ships;
-  tickCount = 0;
-});
-
-addButton('pause', 'pauseButton', e => {
-  paused = !paused;
-  e.target.innerHTML = paused ? 'play' : 'pause';
-  if (!paused) {
-    update();
-  }
-});
-
-let jumping = true;
-addButton('toggle "ai"', 'jumpToggleButton', e => {
-  jumping = !jumping;
-});
-
-let drawDebug = false;
-addButton('toggle debug', 'debugToggleButton', e => {
-  drawDebug = !drawDebug;
-});
-
-
-
-
 
 update(); // start loop

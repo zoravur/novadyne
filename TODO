@@ -1,6 +1,21 @@
 - ~~Terraforming planets -- cool down before switching allegiances~~
+- Menus could be better
+    - Level builder
+    - Set level seed for procedural generation
 - Better AI
+    - Trying to construct a high level AI from raw game data is both wasteful and difficult -- need to provide higher 
+        level derived game features globally. These can be shared among each AI, and each AI can make its own decisions
+        based on which statistics it deems relevant. This is the idea behind the yet unfinished GameStatistics class -- 
+        it calculates the expensive stuff once per tick, and provides it to all AIs. 
 - More levels
+- Procedural generation!
 - Multiplayer
 - ~~2+ teams~~
+- RL?
+    - See: C / server implementation
 - PVP?
+    - See: C / server implementation
+- C / server implementation
+    - Want to write a C based game env, which can be easily turned into a gym environment for RL, and can be run on a 
+        python based game server for the purposes of PVP.
+    - https://chatgpt.com/c/675c6446-5b94-800c-987f-720052c84e15
