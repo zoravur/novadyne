@@ -4,4 +4,4 @@ This is the proof-of-concept for Novadyne, a space RTS based on the classic flas
 
 I want to add 2.5d graphics, multiplayer, more levels, and stronger AI.
 
-![demo gif](https://github.com/zoravur/novadyne/output.gif)
+![demo gif](https://github.com/zoravur/novadyne/blob/master/output.gif)
