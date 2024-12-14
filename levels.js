@@ -1,5 +1,14 @@
 import { randomColor, planetRandom } from "./util.js";
 
+function createPlanet(x, y, team, size) {
+  return {
+    x, y, team,
+    terraforming: {team, completion: team === null ? 0 : 1},
+    size,
+    color: randomColor(planetRandom),
+  }
+}
+
 // LEVEL 1 COMPLETE
 const level1 = {
   planets: [
@@ -24,7 +33,7 @@ const level1 = {
 };
 
 // LEVEL 2 COMPLETE
-const level2 = {
+const level3 = {
   planets: [
     {
       x: 1247,
@@ -102,7 +111,7 @@ const level2 = {
   ships: [],
 };
 
-const level3 = {
+const level2 = {
   planets: [
     {
       x: 300,
@@ -149,7 +158,7 @@ const level3 = {
       y: 600,
       team: "RED",
       terraforming: { team: "RED", completion: 1 },
-      size: 30,
+      size: 50,
       color: randomColor(planetRandom),
     },
   ],
@@ -159,31 +168,37 @@ const level3 = {
 const level4 = {
   planets: [
     {
-      x: 700,
-      y: 800,
+      x: 700-50,
+      y: 800-50,
       team: "BLUE",
       terraforming: { team: "BLUE", completion: 1 },
       size: 30,
       color: randomColor(planetRandom),
     },
     {
-      x: 1200,
-      y: 800,
+      x: 1200-50,
+      y: 800-50,
       team: "YELLOW",
       terraforming: { team: "YELLOW", completion: 1 },
       size: 30,
       color: randomColor(planetRandom),
     },
     {
-      x: 950,
-      y: 400,
+      x: 950-50,
+      y: 400-50,
       team: "RED",
       terraforming: { team: "RED", completion: 1 },
       size: 30,
       color: randomColor(planetRandom),
     },
+    createPlanet(700-50, 550-50, null, 30),
+    createPlanet(1200-50, 550-50, null, 30),
+    createPlanet(950-50, 950-50, null, 30),
   ],
   ships: [],
 };
+
+// const level5 
+
 
 export const levels = [level1, level2, level3, level4];

@@ -1,14 +1,14 @@
 - ~~Terraforming planets -- cool down before switching allegiances~~
 - Menus could be better
     - Level builder
-    - Procedural generation / random levels
-        - set seed
+    - Set level seed for procedural generation
 - Better AI
     - Trying to construct a high level AI from raw game data is both wasteful and difficult -- need to provide higher 
         level derived game features globally. These can be shared among each AI, and each AI can make its own decisions
         based on which statistics it deems relevant. This is the idea behind the yet unfinished GameStatistics class -- 
         it calculates the expensive stuff once per tick, and provides it to all AIs. 
 - More levels
+- Procedural generation!
 - Multiplayer
 - ~~2+ teams~~
 - RL?

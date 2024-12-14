@@ -24,7 +24,8 @@ import {
   computeSquaredDistance,
 } from "./util.js";
 import { buildUi } from './ui.js';
-import { RandomAI, GreedyAI, MixedAI } from "./ai.js";
+import { RandomAI, GreedyAI, MixedAI, CleverAI, DefensiveAI, NullAI } from "./ai.js";
+import { GameStatistics } from './gameStatistics.js';
 
 // seeds i like: [6, 7, 8, 9]
 // Example usage
@@ -42,12 +43,12 @@ const globalGameState = {
   planets: levels[LEVEL_NUM-1].planets,
   ships: levels[LEVEL_NUM-1].ships,
   tickCount: 0,
+  gameResult: null,
 }
 
 let hoveredPlanet = null;
 let selectedPlanets = [];
 let explosions = [];
-let gameResult = null;
 
 const preferences = {
   paused: false,
@@ -59,9 +60,19 @@ function selectLevel(lvlNum) {
   globalGameState.planets = levels[lvlNum-1].planets;
   globalGameState.ships = levels[lvlNum-1].ships;
   globalGameState.tickCount = 0;
+  globalGameState.gameResult = null;
 }
 
 buildUi(preferences, selectLevel, update);
+
+const gameStats = new GameStatistics(globalGameState);
+
+// let opponent = new GreedyAI(globalGameState, 'RED');
+// let opponentGreen = new GreedyAI(globalGameState, 'YELLOW');
+
+let opponents = Object.keys(teamColorMap)
+  //.filter(team => team !== 'BLUE')
+  .map(team => team === 'BLUE' ? new NullAI(globalGameState, team, gameStats) : new CleverAI(globalGameState, team, gameStats));
 
 // create some random planets
 // let blueMass = 0;
@@ -94,12 +105,6 @@ function reassignFraction(pIdx1, pIdx2, team, frac = 0.6) {
   });
 }
 
-// let opponent = new GreedyAI(globalGameState, 'RED');
-// let opponentGreen = new GreedyAI(globalGameState, 'YELLOW');
-
-let opponents = Object.keys(teamColorMap)
-  //.filter(team => team !== 'BLUE')
-  .map(team => new MixedAI(globalGameState, team));
 
 // main game loop
 function update() {
@@ -155,24 +160,7 @@ function update() {
   /////////////////// model combat and generation ///////////////////////////
   if (globalGameState.tickCount % 1 === 0) {
     //////////// compute statistics //////////////////
-    let totalPerTeam = Object.fromEntries(Object.keys(teamColorMap).map(team => [team, 0]))
-    let teamCapacities = planets.reduce((acc, planet) => { 
-      acc[planet.team] = (acc[planet.team] || 0) + planet.size; 
-      return acc; 
-    }, {});
-
-    let buckets = Array.from({length: planets.length}, (_, idx) => ({  
-      ships: [], 
-      counts: Object.fromEntries(Object.keys(teamColorMap).map(team => [team, 0]))
-    }));
-    ships.forEach((ship, shipIdx) => {
-      if (ship.orbiting) {
-        buckets[ship.planetIdx].ships.push(shipIdx);
-        buckets[ship.planetIdx].counts[ship.team] = buckets[ship.planetIdx].counts[ship.team] + 1 || 1;
-      }
-      totalPerTeam[ship.team] = totalPerTeam[ship.team] + 1 || 1;
-    });
-
+    const { totalPerTeam, teamCapacities, buckets } = gameStats.computeStatistics();
 
     ////////////// update ///////////////////////////
     let newShips = [...ships];
@@ -263,13 +251,12 @@ function update() {
 
   const blueCount = ships.filter(ship => ship.team === 'BLUE').length;
   if (blueCount === ships.length && globalGameState.tickCount > 500) {
-    gameResult = 'VICTORY';
+    globalGameState.gameResult = 'VICTORY';
   } else if (blueCount === 0 && globalGameState.tickCount > 500) {
-    gameResult = 'DEFEAT';
+    globalGameState.gameResult = 'DEFEAT';
   }
 
-  if (gameResult) {
-    console.log('YEEEEE');
+  if (globalGameState.gameResult) {
     for (let team of Object.keys(teamColorMap)) {
       reassignFraction(Math.floor(seededRandom() * planets.length), Math.floor(seededRandom() * planets.length), team, 0.3);
     }
@@ -284,7 +271,7 @@ function update() {
   explosions = explosions.filter(exp => !exp.isCompleted());
 
   //////////////////////// rendering / RENDERING /////////////////////////////
-  render(ctx, canvas, planets, ships, explosions, hoveredPlanet, selectedPlanets, preferences.drawDebug, gameResult, mouseX, mouseY);
+  render(ctx, canvas, planets, ships, explosions, hoveredPlanet, selectedPlanets, preferences.drawDebug, globalGameState.gameResult, mouseX, mouseY);
 
   if (preferences.paused === true) return;
   requestAnimationFrame(update);

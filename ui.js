@@ -23,6 +23,10 @@ export function buildUi(preferences, selectLevel, update) {
     addButton('play lvl3', 'lvl3Select', e => {
         selectLevel(3);
     });
+
+    addButton('play lvl4', 'lvl4Select', e => {
+        selectLevel(4);
+    });
     
     addButton('pause', 'pauseButton', e => {
       preferences.paused = !preferences.paused;
