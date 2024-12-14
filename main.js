@@ -14,7 +14,7 @@ import {
 } from "./constants.js";
 
 import { Explosion, drawTerraforming, drawShip, render } from "./graphics.js";
-import { levels } from "./levels.js";
+import { levels, setRandomLevel } from "./levels.js";
 import {
   createSeededRandom,
   normalizeVec,
@@ -63,7 +63,7 @@ function selectLevel(lvlNum) {
   globalGameState.gameResult = null;
 }
 
-buildUi(preferences, selectLevel, update);
+buildUi(preferences, selectLevel, update, seed => setRandomLevel(seed, globalGameState));
 
 const gameStats = new GameStatistics(globalGameState);
 

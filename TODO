@@ -1,7 +1,7 @@
 - ~~Terraforming planets -- cool down before switching allegiances~~
 - Menus could be better
     - Level builder
-    - Set level seed for procedural generation
+    - ~~Set level seed for procedural generation~~
 - Better AI
     - Trying to construct a high level AI from raw game data is both wasteful and difficult -- need to provide higher 
         level derived game features globally. These can be shared among each AI, and each AI can make its own decisions

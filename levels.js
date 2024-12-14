@@ -1,4 +1,5 @@
-import { randomColor, planetRandom } from "./util.js";
+import { randomColor, planetRandom, createSeededRandom, fastSoftmaxSample, createCounter, computeSquaredDistance } from "./util.js";
+import { TEAMS } from './constants.js';
 
 function createPlanet(x, y, team, size) {
   return {
@@ -202,3 +203,45 @@ const level4 = {
 
 
 export const levels = [level1, level2, level3, level4];
+
+export function setRandomLevel(seed, globalGameState) {
+  const planets = [];
+  
+  let random = createSeededRandom(seed);
+
+  let n_teams = (random() < 0.2) + 2;
+  const teamTotalMass = createCounter(TEAMS.slice(0, n_teams));
+  // let totalMass = 0;
+
+  let numPlanets = Math.floor(random() * 10) + n_teams;
+  for (let i = 0; i < numPlanets; i += 1) {
+
+    const probs = Object.values(teamTotalMass).map(mass => mass > 0 ? 1/mass : Number.MAX_SAFE_INTEGER);
+
+    const teamIdxToAdd = fastSoftmaxSample(probs);
+
+    const planetTeam = TEAMS[teamIdxToAdd];
+    const planetMass = 20+Math.floor(80*random());
+
+    teamTotalMass[planetTeam] += planetMass;
+    // totalMass += planetMass;
+
+    let candidatePlanet;
+    outer: while (true) {
+      candidatePlanet = createPlanet(Math.floor(random()*900)+100, Math.floor(random()*700)+100, planetTeam, planetMass);
+      for (let planet of planets) {
+        if (Math.sqrt(computeSquaredDistance(planet, candidatePlanet)) < planet.size + candidatePlanet.size + 10) {
+          continue outer;
+        }
+      }
+      break;
+    }
+
+    planets.push(candidatePlanet);
+  }
+
+  globalGameState.planets = planets;
+  globalGameState.ships = [];
+  globalGameState.tickCount = 0;
+  globalGameState.gameResult = null;
+}

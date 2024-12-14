@@ -7,9 +7,38 @@ function addButton(text, id, onclick) {
     document.getElementById('buttonContainer').appendChild(btn);
     btn.addEventListener('click', onclick);
 }
-  
 
-export function buildUi(preferences, selectLevel, update) {
+function createLevelSeedInput(seedEventListener) {
+  // Assume that there is a div in the HTML with the id "buttonContainer"
+  const container = document.getElementById('buttonContainer');
+  
+  // Create an input element
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.id = 'levelSeed';
+  input.placeholder = 'Set level seed for random level...';
+  
+  // Create a button element
+  const button = document.createElement('button');
+  button.id = 'levelSeedSubmit';
+  button.textContent = 'Set seed';
+  
+  // Add the event listener to the button
+  button.addEventListener('click', e => {
+    seedEventListener(parseInt(input.value));
+  });
+  
+  // Append the elements into the container
+  container.appendChild(input);
+  container.appendChild(button);
+}
+
+
+export function buildUi(preferences, selectLevel, update, createRandomLevel) {
+
+    createLevelSeedInput(seed => {
+      createRandomLevel(seed)
+    });
 
     addButton('play lvl1', 'lvl1Select', e => {
         selectLevel(1);

@@ -49,7 +49,9 @@ export function fisherYates(array) {
     }
     return array; 
 }
-  
+
+
+export const createCounter = els => Object.fromEntries(els.map(el => [el, 0]));
 
 export function randomColor(randomFunc) {
   return `hsl(${randomFunc() * 360}, 65%, 55%)`;

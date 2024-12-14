@@ -14,3 +14,5 @@ export const teamColorMap = {
   RED: `hsl(${0.05 * 360}, 80%, 60%)`,
   YELLOW: `hsl(${0.35 * 360}, 80%, 60%)`,
 };
+
+export const TEAMS = Object.keys(teamColorMap);
