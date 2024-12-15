@@ -105,175 +105,193 @@ function reassignFraction(pIdx1, pIdx2, team, frac = 0.6) {
   });
 }
 
+let lastUpdateTime = Date.now();
+let accumTime = 0;
+
+// Fix the timestep at updates per second
+const MS_PER_FRAME = 1000 / 120;
 
 // main game loop
 function update() {
   const { planets, ships } = globalGameState;
 
-  globalGameState.tickCount += SIM_FACTOR;
-  
-  if (globalGameState.tickCount % 60 === 0 && preferences.jumping) {
-    for (let opponent of opponents) {
-      let { fromPlanet, toPlanet, fractionToMove } = opponent.sampleAction();
-  
-      reassignFraction(fromPlanet, toPlanet, opponent.team, fractionToMove);
+  const curTime = Date.now();
+  const dt = curTime - lastUpdateTime;
+  lastUpdateTime = curTime;
+
+  accumTime += dt;
+
+  while(accumTime >= MS_PER_FRAME) {
+    accumTime -= MS_PER_FRAME;
+
+    if(preferences.paused) continue;
+
+    globalGameState.tickCount += SIM_FACTOR;
+
+    if (globalGameState.tickCount % 60 === 0 && preferences.jumping) {
+      for (let opponent of opponents) {
+        let { fromPlanet, toPlanet, fractionToMove } = opponent.sampleAction();
+
+        reassignFraction(fromPlanet, toPlanet, opponent.team, fractionToMove);
+      }
+      // const idx1 = Math.floor(seededRandom() * planets.length);
+      // let idx2 = idx1;
+
+      // while (idx2 == idx1) {
+      //   idx2 = Math.floor(seededRandom() * planets.length);
+      // }
+
+      // if (preferences.jumping) reassignFraction(idx1, idx2, 'RED', 0.8);
     }
-    // const idx1 = Math.floor(seededRandom() * planets.length);
-    // let idx2 = idx1;
-    
-    // while (idx2 == idx1) {
-    //   idx2 = Math.floor(seededRandom() * planets.length);
-    // }
 
-    // if (preferences.jumping) reassignFraction(idx1, idx2, 'RED', 0.8);
-  }
+    /// ship movement -- this code is super janky
+    ships.forEach(ship => {
+      //const {planet: closestPlanet, distance: d, idx} = findClosestPlanet(ship.x, ship.y);
+      const shipPlanet = planets[ship.planetIdx];
+      const d = computeSquaredDistance(shipPlanet, ship);
 
-  /// ship movement -- this code is super janky
-  ships.forEach(ship => {
-    //const {planet: closestPlanet, distance: d, idx} = findClosestPlanet(ship.x, ship.y);
-    const shipPlanet = planets[ship.planetIdx];
-    const d = computeSquaredDistance(shipPlanet, ship);
+      if (d * 0.81 < (shipPlanet.size)*(shipPlanet.size)*ship.orbitRadius) {
+        ship.orbiting = true;
+      } else {
+        ship.orbiting = false;
+      }
 
-    if (d * 0.81 < (shipPlanet.size)*(shipPlanet.size)*ship.orbitRadius) {
-      ship.orbiting = true;
-    } else {
-      ship.orbiting = false;
-    }
+      let {x: dx, y: dy} = normalizeVec(shipPlanet.x - ship.x, shipPlanet.y - ship.y)
 
-    let {x: dx, y: dy} = normalizeVec(shipPlanet.x - ship.x, shipPlanet.y - ship.y)
-
-    ship.dx = dx;
-    ship.dy = dy;
+      ship.dx = dx;
+      ship.dy = dy;
 
 
-    let altitudeDelta = (shipPlanet.size)*(shipPlanet.size) * ship.orbitRadius - (d * 0.9)
-    
-    if (ship.orbiting) {
-      ship.x += (-(0.001*altitudeDelta*ship.dx) + ship.dy) * SIM_FACTOR;
-      ship.y += (-(0.001*altitudeDelta*ship.dy) - ship.dx) * SIM_FACTOR;
-    } else {
-      ship.x += ship.dx * SIM_FACTOR;
-      ship.y += ship.dy * SIM_FACTOR;
-    }
-  });
+      let altitudeDelta = (shipPlanet.size)*(shipPlanet.size) * ship.orbitRadius - (d * 0.9)
 
-  /////////////////// model combat and generation ///////////////////////////
-  if (globalGameState.tickCount % 1 === 0) {
-    //////////// compute statistics //////////////////
-    const { totalPerTeam, teamCapacities, buckets } = gameStats.computeStatistics();
+      if (ship.orbiting) {
+        ship.x += (-(0.001*altitudeDelta*ship.dx) + ship.dy) * SIM_FACTOR;
+        ship.y += (-(0.001*altitudeDelta*ship.dy) - ship.dx) * SIM_FACTOR;
+      } else {
+        ship.x += ship.dx * SIM_FACTOR;
+        ship.y += ship.dy * SIM_FACTOR;
+      }
+    });
 
-    ////////////// update ///////////////////////////
-    let newShips = [...ships];
-    buckets.forEach((bucket, planetIdx) => {
+    /////////////////// model combat and generation ///////////////////////////
+    if (globalGameState.tickCount % 1 === 0) {
+      //////////// compute statistics //////////////////
+      const { totalPerTeam, teamCapacities, buckets } = gameStats.computeStatistics();
 
-      /// combat ////
-      let x = bucket.ships.length;
-      const teams = Object.keys(bucket.counts);
-      if (globalGameState.tickCount % 20 === 0) {
-        let actionProb = x > 0 ? Math.exp((x - 30)/30) / (1 + Math.exp((x-30)/ 30)) : 0;
-        if (seededRandom() < actionProb) {
-          const hitter = fastSoftmaxSample(teams.map(t => bucket.counts[t]));
-          teams.splice(hitter, 1);
-          const hittee = fastSoftmaxSample(teams.map(t => bucket.counts[t]));
-          
-          //console.log('hittee ===', hittee);
-          const selectedTeam = teams[hittee];
-          for (let i = bucket.ships.length-1; i >= 0; --i) {
-            let shipIdx = bucket.ships[i];
-            if (ships[shipIdx].team === selectedTeam && ships[shipIdx].orbiting) {
-              newShips.splice(shipIdx, 1);
-              x -= 1;
-              explosions.push(new Explosion(ships[shipIdx].x, ships[shipIdx].y));
-              break;
+      ////////////// update ///////////////////////////
+      let newShips = [...ships];
+      buckets.forEach((bucket, planetIdx) => {
+
+        /// combat ////
+        let x = bucket.ships.length;
+        const teams = Object.keys(bucket.counts);
+        if (globalGameState.tickCount % 20 === 0) {
+          let actionProb = x > 0 ? Math.exp((x - 30)/30) / (1 + Math.exp((x-30)/ 30)) : 0;
+          if (seededRandom() < actionProb) {
+            const hitter = fastSoftmaxSample(teams.map(t => bucket.counts[t]));
+            teams.splice(hitter, 1);
+            const hittee = fastSoftmaxSample(teams.map(t => bucket.counts[t]));
+
+            //console.log('hittee ===', hittee);
+            const selectedTeam = teams[hittee];
+            for (let i = bucket.ships.length-1; i >= 0; --i) {
+              let shipIdx = bucket.ships[i];
+              if (ships[shipIdx].team === selectedTeam && ships[shipIdx].orbiting) {
+                newShips.splice(shipIdx, 1);
+                x -= 1;
+                explosions.push(new Explosion(ships[shipIdx].x, ships[shipIdx].y));
+                break;
+              }
             }
           }
         }
-      }
 
-      /// allegiance switching ///
-      teams.forEach(t => {
-        if (preferences.drawDebug) {
-          // console.log(bucket.counts[t], x, t);
-        }
+        /// allegiance switching ///
+        teams.forEach(t => {
+          if (preferences.drawDebug) {
+            // console.log(bucket.counts[t], x, t);
+          }
 
-        if (bucket.counts[t] && bucket.counts[t] >= x) {
-          // terraforming will be modified
-          // planet.terraforming == {team: _____, completion: ______}
-          // completion is greater than or equal to 0 at all times
+          if (bucket.counts[t] && bucket.counts[t] >= x) {
+            // terraforming will be modified
+            // planet.terraforming == {team: _____, completion: ______}
+            // completion is greater than or equal to 0 at all times
 
-          const planet = planets[planetIdx];
-          if (planet.terraforming.team === t) {
-            planet.terraforming.completion += bucket.counts[t]/BASE_TERRAFORMING_RATE/planet.size;
-            if (planet.terraforming.completion >= 1) {
-              planet.terraforming.completion = 1;
-              planet.team = t;
+            const planet = planets[planetIdx];
+            if (planet.terraforming.team === t) {
+              planet.terraforming.completion += bucket.counts[t]/BASE_TERRAFORMING_RATE/planet.size;
+              if (planet.terraforming.completion >= 1) {
+                planet.terraforming.completion = 1;
+                planet.team = t;
+              }
+            } else if (planet.terraforming.team !== t) {
+              planet.terraforming.completion -= bucket.counts[t]/BASE_TERRAFORMING_RATE/planet.size;
+              planet.terraforming.completion = Math.max(planet.terraforming.completion, 0);
+              if (planet.terraforming.completion === 0) {
+                planet.team = null;
+                planet.terraforming.team = t;
+              }
             }
-          } else if (planet.terraforming.team !== t) {
-            planet.terraforming.completion -= bucket.counts[t]/BASE_TERRAFORMING_RATE/planet.size;
-            planet.terraforming.completion = Math.max(planet.terraforming.completion, 0);
-            if (planet.terraforming.completion === 0) {
-              planet.team = null;
-              planet.terraforming.team = t;
+          }
+        });
+
+        /// production / generation / terraforming
+        // generation is constant
+        if (planets[planetIdx].terraforming.completion === 1) {
+          if (totalPerTeam[planets[planetIdx].team] < teamCapacities[planets[planetIdx].team]) {
+            // if we are over capacity, do not produce
+            const productionRate = planets[planetIdx].size;
+            const baseRate = Math.floor(500 / BASE_PRODUCTION_RATE);
+            //console.log('generation');
+            // console.log(globalGameState.tickCount / 20, Math.floor(baseRate / productionRate));
+            if ((globalGameState.tickCount / 20) % (Math.ceil(baseRate / productionRate)+1) === 0) {
+              // if (planetIdx === 0) {
+              //   console.log(totalPerTeam, teamCapacities);
+              // }
+              const orbitRadius = 1 / (seededRandom() * 0.5 + 0.3);
+              newShips.push({
+                x: planets[planetIdx].x,
+                y: planets[planetIdx].y + planets[planetIdx].size * Math.sqrt(orbitRadius),
+                orbitRadius,
+                orbiting: true,
+                team: planets[planetIdx].team,
+                color: teamColorMap[planets[planetIdx].team],
+                planetIdx,
+              });
             }
           }
         }
       });
-
-      /// production / generation / terraforming
-      // generation is constant
-      if (planets[planetIdx].terraforming.completion === 1) {
-        if (totalPerTeam[planets[planetIdx].team] < teamCapacities[planets[planetIdx].team]) {
-          // if we are over capacity, do not produce
-          const productionRate = planets[planetIdx].size;
-          const baseRate = Math.floor(500 / BASE_PRODUCTION_RATE);
-          //console.log('generation');
-          // console.log(globalGameState.tickCount / 20, Math.floor(baseRate / productionRate));
-          if ((globalGameState.tickCount / 20) % (Math.ceil(baseRate / productionRate)+1) === 0) {
-            // if (planetIdx === 0) {
-            //   console.log(totalPerTeam, teamCapacities);
-            // }
-            const orbitRadius = 1 / (seededRandom() * 0.5 + 0.3);
-            newShips.push({ 
-              x: planets[planetIdx].x,
-              y: planets[planetIdx].y + planets[planetIdx].size * Math.sqrt(orbitRadius),
-              orbitRadius,
-              orbiting: true,
-              team: planets[planetIdx].team,
-              color: teamColorMap[planets[planetIdx].team],
-              planetIdx,
-            });
-          }
-        }
-      }
-    });
-    globalGameState.ships = newShips;
-  }
-
-  const blueCount = ships.filter(ship => ship.team === 'BLUE').length;
-  if (blueCount === ships.length && globalGameState.tickCount > 500) {
-    globalGameState.gameResult = 'VICTORY';
-  } else if (blueCount === 0 && globalGameState.tickCount > 500) {
-    globalGameState.gameResult = 'DEFEAT';
-  }
-
-  if (globalGameState.gameResult) {
-    for (let team of Object.keys(teamColorMap)) {
-      reassignFraction(Math.floor(seededRandom() * planets.length), Math.floor(seededRandom() * planets.length), team, 0.3);
+      globalGameState.ships = newShips;
     }
-  }
 
-  // Step and draw each explosion
-  for (const explosion of explosions) {
-    explosion.step();
+    const blueCount = ships.filter(ship => ship.team === 'BLUE').length;
+    if (blueCount === ships.length && globalGameState.tickCount > 500) {
+      globalGameState.gameResult = 'VICTORY';
+    } else if (blueCount === 0 && globalGameState.tickCount > 500) {
+      globalGameState.gameResult = 'DEFEAT';
+    }
+
+    if (globalGameState.gameResult) {
+      for (let team of Object.keys(teamColorMap)) {
+        reassignFraction(Math.floor(seededRandom() * planets.length), Math.floor(seededRandom() * planets.length), team, 0.3);
+      }
+    }
+
+    // Step and draw each explosion
+    for (const explosion of explosions) {
+      explosion.step();
+    }
+
+    // Remove completed explosions
+    explosions = explosions.filter(exp => !exp.isCompleted());
   }
   
-  // Remove completed explosions
-  explosions = explosions.filter(exp => !exp.isCompleted());
+  // NOTE(Apaar): Render as fast as possible (TODO: interpolate between frames)
 
   //////////////////////// rendering / RENDERING /////////////////////////////
   render(ctx, canvas, planets, ships, explosions, hoveredPlanet, selectedPlanets, preferences.drawDebug, globalGameState.gameResult, mouseX, mouseY);
 
-  if (preferences.paused === true) return;
   requestAnimationFrame(update);
 }
 
