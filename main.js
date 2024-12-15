@@ -72,7 +72,7 @@ const gameStats = new GameStatistics(globalGameState);
 
 let opponents = Object.keys(teamColorMap)
   //.filter(team => team !== 'BLUE')
-  .map(team => team === 'BLUE' ? new NullAI(globalGameState, team, gameStats) : new CleverAI(globalGameState, team, gameStats));
+  .map(team => team === 'BLUE' ? new CleverAI(globalGameState, team, gameStats) : new CleverAI(globalGameState, team, gameStats));
 
 // create some random planets
 // let blueMass = 0;

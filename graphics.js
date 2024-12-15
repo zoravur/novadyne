@@ -1,4 +1,5 @@
 import { teamColorMap } from "./constants.js";
+import { rotateVec } from "./util.js";
 
 export class Explosion {
   constructor(x, y) {
@@ -190,7 +191,52 @@ export function drawShip(ctx, x, y, dx, dy, fill) {
   //ctx.stroke();
 }
 
+
+const transformation = [
+  [Math.sqrt(3)/2,-Math.sqrt(3)/2,-100],
+  [1/2,1/2,-100]
+];
+
+const origin = {
+  x: 900,
+  y: 650,
+}
+
+const topLeft = {
+  x: 0,
+  y: 0,
+}
+
+const i_hat = {
+  x: Math.sqrt(3)/2,
+  y: -0.5,
+}
+
+const j_hat = {
+  x: Math.sqrt(3)/2,
+  y: 0.5,
+}
+
+const rotated_i = rotateVec(i_hat.x, i_hat.y, topLeft.x, topLeft.y, 0*-Math.PI/4);
+const rotated_j = rotateVec(j_hat.x, j_hat.y, topLeft.x, topLeft.y, 0*-Math.PI/4);
+const rotated_topLeft = rotateVec(topLeft.x, topLeft.y, origin.x, origin.y, -1*Math.atan2(origin.y, origin.x));
+
+const rotationAboutCenter = [
+  [rotated_i.x, rotated_j.x, rotated_topLeft.x],
+  [rotated_i.y, rotated_j.y, rotated_topLeft.y],
+]
+
+
 export function render(ctx, canvas, planets, ships, explosions, hoveredPlanet, selectedPlanets, drawDebug, gameResult, mouseX, mouseY) {
+  
+  ctx.save();
+  const [
+    [a, c, e],
+    [b, d, f]
+  ] = rotationAboutCenter;
+  console.log(rotationAboutCenter);
+  ctx.transform(a, b, c, d, e, f);
+  
   // redraw everything
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = "#222";
@@ -311,4 +357,6 @@ export function render(ctx, canvas, planets, ships, explosions, hoveredPlanet, s
     // draw the text
     ctx.fillText(gameResult, centerX, centerY);
   }
+
+  ctx.restore();
 }

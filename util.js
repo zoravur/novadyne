@@ -58,3 +58,22 @@ export function randomColor(randomFunc) {
 }
 
 export const planetRandom = createSeededRandom(1);
+
+export const rotateVec = (x, y, h, k, theta) => {
+  // convert degrees to radians
+  const radians = theta;
+  
+  // translate the point to origin
+  const translatedX = x - h;
+  const translatedY = y - k;
+
+  // apply the rotation
+  const rotatedX = translatedX * Math.cos(radians) - translatedY * Math.sin(radians);
+  const rotatedY = translatedX * Math.sin(radians) + translatedY * Math.cos(radians);
+
+  // translate the point back
+  const finalX = rotatedX + h;
+  const finalY = rotatedY + k;
+
+  return { x: finalX, y: finalY };
+};
