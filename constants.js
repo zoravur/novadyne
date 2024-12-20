@@ -9,6 +9,9 @@ export const BASE_PRODUCTION_RATE = 1;
 export const BASE_TERRAFORMING_RATE = 500; // smaller is faster
 export const LEVEL_NUM = 1;
 
+// Fix the timestep at updates per second
+export const MS_PER_FRAME = 1000 / FRAMERATE;
+
 export const teamColorMap = {
   BLUE: `hsl(${0.55 * 360}, 80%, 60%)`,
   RED: `hsl(${0.05 * 360}, 80%, 60%)`,

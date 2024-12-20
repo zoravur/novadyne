@@ -10,6 +10,7 @@ import {
   BASE_PRODUCTION_RATE,
   BASE_TERRAFORMING_RATE,
   LEVEL_NUM,
+  MS_PER_FRAME,
   teamColorMap,
 } from "./constants.js";
 
@@ -105,17 +106,15 @@ function reassignFraction(pIdx1, pIdx2, team, frac = 0.6) {
   });
 }
 
-let lastUpdateTime = Date.now();
+let lastUpdateTime = performance.now();
 let accumTime = 0;
 
-// Fix the timestep at updates per second
-const MS_PER_FRAME = 1000 / 120;
 
 // main game loop
 function update() {
   const { planets, ships } = globalGameState;
 
-  const curTime = Date.now();
+  const curTime = performance.now();
   const dt = curTime - lastUpdateTime;
   lastUpdateTime = curTime;
 
@@ -128,7 +127,7 @@ function update() {
 
     globalGameState.tickCount += SIM_FACTOR;
 
-    if (globalGameState.tickCount % 60 === 0 && preferences.jumping) {
+    if (globalGameState.tickCount % FRAMERATE === 0 && preferences.jumping) {
       for (let opponent of opponents) {
         let { fromPlanet, toPlanet, fractionToMove } = opponent.sampleAction();
 
